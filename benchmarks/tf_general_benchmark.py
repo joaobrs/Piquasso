@@ -42,62 +42,77 @@ def xi():
     return 0.3
 
 
-parameters = [(d, unitary_group.rvs(d)) for d in range(3, 5)]
+@pytest.fixture
+def cutoff():
+    return 10
 
 
-@pytest.mark.parametrize("d, interferometer", parameters)
-def piquasso_benchmark(benchmark, d, interferometer, alpha, r, xi):
-    @benchmark
-    def func():
-        alpha_ = tf.Variable(alpha)
+def piquasso_benchmark(cutoff, alpha, r, xi):
+    profiler_options = tf.profiler.experimental.ProfilerOptions(
+        host_tracer_level=3, python_tracer_level=3, device_tracer_level=3
+    )
 
-        with pq.Program() as program:
-            pq.Q(all) | pq.Vacuum()
+    tf.profiler.experimental.start("logdir", options=profiler_options)
 
-            for i in range(d):
-                pq.Q(i) | pq.Displacement(r=alpha) | pq.Squeezing(r)
+    alpha_ = tf.Variable(alpha)
 
-            pq.Q(all) | pq.Interferometer(interferometer)
+    with pq.Program() as program:
+        pq.Q(all) | pq.Vacuum()
 
-            for i in range(d):
-                pq.Q(i) | pq.Kerr(xi)
+        pq.Q(0) | pq.Displacement(r=alpha_)
+        pq.Q(1) | pq.Displacement(r=alpha_)
+        pq.Q(0) | pq.Squeezing(r)
+        pq.Q(1) | pq.Squeezing(r)
+        pq.Q(all) | pq.Interferometer(unitary_group.rvs(2))
+        pq.Q(0) | pq.Kerr(xi)
+        pq.Q(1) | pq.Kerr(xi)
 
-        simulator_fock = pq.TensorflowPureFockSimulator(d=d, config=pq.Config(cutoff=d))
+    simulator_fock = pq.TensorflowPureFockSimulator(
+        d=2, config=pq.Config(cutoff=cutoff)
+    )
 
-        with tf.GradientTape() as tape:
-            state = simulator_fock.execute(program).state
-            mean_photon_number = state.mean_photon_number()
+    with tf.GradientTape() as tape:
+        state = simulator_fock.execute(program).state
+        mean_position = state.mean_position(0)
 
-        tape.gradient(mean_photon_number, [alpha_])
+    tape.gradient(mean_position, [alpha_])
+
+    tf.profiler.experimental.stop()
 
 
-@pytest.mark.parametrize("d, interferometer", parameters)
-def strawberryfields_benchmark(benchmark, d, interferometer, alpha, r, xi):
-    @benchmark
-    def func():
-        program = sf.Program(d)
+def strawberryfields_benchmark(cutoff, alpha, r, xi):
 
-        mapping = {}
+    profiler_options = tf.profiler.experimental.ProfilerOptions(
+        host_tracer_level=3, python_tracer_level=3, device_tracer_level=3
+    )
 
-        alpha_ = tf.Variable(alpha)
-        param = program.params("alpha")
-        mapping["alpha"] = alpha_
+    tf.profiler.experimental.start("logdir", options=profiler_options)
 
-        engine = sf.Engine(backend="tf", backend_options={"cutoff_dim": d})
+    program = sf.Program(2)
 
-        with program.context as q:
-            for i in range(d):
-                sf.ops.Dgate(param) | q[i]
-                sf.ops.Sgate(r) | q[i]
+    mapping = {}
 
-            sf.ops.Interferometer(interferometer) | tuple(q[i] for i in range(d))
+    alpha_ = tf.Variable(alpha)
+    param = program.params("alpha")
+    mapping["alpha"] = alpha_
 
-            for i in range(d):
-                sf.ops.Kgate(xi) | q[i]
+    engine = sf.Engine(backend="tf", backend_options={"cutoff_dim": cutoff})
 
-        with tf.GradientTape() as tape:
-            result = engine.run(program, args=mapping)
-            state = result.state
-            mean = sum([state.mean_photon(mode)[0] for mode in range(d)])
+    with program.context as q:
+        for i in range(2):
+            sf.ops.Dgate(param) | q[i]
+            sf.ops.Sgate(r) | q[i]
 
-        tape.gradient(mean, [alpha_])
+        sf.ops.Interferometer(unitary_group.rvs(2)) | tuple(q[i] for i in range(2))
+
+        for i in range(2):
+            sf.ops.Kgate(xi) | q[i]
+
+    with tf.GradientTape() as tape:
+        result = engine.run(program, args=mapping)
+        state = result.state
+        mean = sum([state.quad_expectation(mode)[0] for mode in range(2)])
+
+    tape.gradient(mean, [alpha_])
+
+    tf.profiler.experimental.stop()

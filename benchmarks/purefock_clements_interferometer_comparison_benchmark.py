@@ -48,7 +48,7 @@ def piquasso_interferometer_benchmark(benchmark, d, cutoff, U):
 
             pq.Q() | pq.Interferometer(U)
 
-        simulator_fock = pq.PureFockSimulator(d=d, config=pq.Config(cutoff=cutoff))
+        simulator_fock = pq.PureFockSimulator(d=d, config=pq.Config(cutoff=15))
 
         simulator_fock.execute(program)
 
@@ -71,7 +71,8 @@ def piquasso_clements_benchmark(benchmark, d, cutoff, U):
                 )
                 pq.Q(*operation["modes"]) | pq.Beamsplitter(operation["params"][0], 0.0)
 
-                pq.Q() | pq.Phaseshifter(np.angle(decomposition.diagonals))
+                for i, angle in enumerate(np.angle(decomposition.diagonals)):
+                    pq.Q(i) | pq.Phaseshifter(angle)
 
             for operation in reversed(decomposition.direct_operations):
                 pq.Q(*operation["modes"]) | pq.Beamsplitter(
@@ -81,6 +82,6 @@ def piquasso_clements_benchmark(benchmark, d, cutoff, U):
                     phi=-operation["params"][1]
                 )
 
-        simulator_fock = pq.PureFockSimulator(d=d, config=pq.Config(cutoff=cutoff))
+        simulator_fock = pq.PureFockSimulator(d=d, config=pq.Config(cutoff=15))
 
         simulator_fock.execute(program)

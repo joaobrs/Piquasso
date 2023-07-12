@@ -33,7 +33,7 @@ def theta():
 
 @pytest.fixture
 def d():
-    return 5
+    return 2
 
 
 @pytest.mark.parametrize("cutoff", range(3, 14))

@@ -41,45 +41,41 @@ def xi():
     return 0.3
 
 
-parameters = [(d, unitary_group.rvs(d)) for d in range(3, 7)]
+@pytest.fixture
+def cutoff():
+    return 40
 
 
-@pytest.mark.parametrize("d, interferometer", parameters)
-def piquasso_benchmark(benchmark, d, interferometer, r, alpha, xi):
-    @benchmark
-    def func():
-        with pq.Program() as program:
-            pq.Q(all) | pq.Vacuum()
+def piquasso_benchmark(cutoff, r, alpha, xi):
+    with pq.Program() as program:
+        pq.Q(all) | pq.Vacuum()
 
-            for i in range(d):
-                pq.Q(i) | pq.Displacement(r=alpha) | pq.Squeezing(r)
+        for i in range(2):
+            pq.Q(i) | pq.Displacement(r=alpha) | pq.Squeezing(r)
 
-            pq.Q(all) | pq.Interferometer(interferometer)
+        pq.Q(all) | pq.Interferometer(unitary_group.rvs(2))
 
-            for i in range(d):
-                pq.Q(i) | pq.Kerr(xi)
+        for i in range(2):
+            pq.Q(i) | pq.Kerr(xi)
 
-        simulator_fock = pq.PureFockSimulator(d=d, config=pq.Config(cutoff=d))
+    simulator_fock = pq.PureFockSimulator(d=2, config=pq.Config(cutoff=cutoff))
 
-        simulator_fock.execute(program)
+    simulator_fock.execute(program)
 
 
-@pytest.mark.parametrize("d, interferometer", parameters)
-def strawberryfields_benchmark(benchmark, d, interferometer, r, alpha, xi):
-    @benchmark
-    def func():
-        eng = sf.Engine(backend="fock", backend_options={"cutoff_dim": d})
+def strawberryfields_benchmark(cutoff, r, alpha, xi):
+    eng = sf.Engine(backend="fock", backend_options={"cutoff_dim": cutoff})
 
-        circuit = sf.Program(d)
+    circuit = sf.Program(2)
 
-        with circuit.context as q:
-            for i in range(d):
-                sf.ops.Dgate(alpha) | q[i]
-                sf.ops.Sgate(r) | q[i]
+    with circuit.context as q:
+        for i in range(2):
+            sf.ops.Dgate(alpha) | q[i]
+            sf.ops.Sgate(r) | q[i]
 
-            sf.ops.Interferometer(interferometer) | tuple(q[i] for i in range(d))
+        sf.ops.Interferometer(unitary_group.rvs(2)) | tuple(q[i] for i in range(2))
 
-            for i in range(d):
-                sf.ops.Kgate(xi) | q[i]
+        for i in range(2):
+            sf.ops.Kgate(xi) | q[i]
 
-        eng.run(circuit)
+    eng.run(circuit)
