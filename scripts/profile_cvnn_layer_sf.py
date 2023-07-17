@@ -104,9 +104,9 @@ np.random.seed(137)
 
 
 # define width and depth of CV quantum neural network
-modes = 7
+modes = 2
 layers = 1
-cutoff = 7
+cutoff = 10
 
 # defining desired state (single photon state)
 target_state = np.zeros([cutoff] * modes)
