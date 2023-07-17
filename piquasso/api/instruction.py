@@ -202,6 +202,10 @@ class Preparation(Instruction):
     """Base class for preparations."""
 
 
+class BatchPreparation(Preparation):
+    """Base class for batch preparations"""
+
+
 class Gate(Instruction):
     """Base class for gates."""
 

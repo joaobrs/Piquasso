@@ -30,6 +30,7 @@ from .calculations import (
     vacuum,
     create,
     annihilate,
+    batch,
 )
 
 from ..calculations import attenuator
@@ -94,6 +95,7 @@ class PureFockSimulator(Simulator):
         preparations.Create: create,
         preparations.Annihilate: annihilate,
         preparations.StateVector: state_vector_instruction,
+        preparations.Batch: batch,
         gates.Interferometer: passive_linear,
         gates.Beamsplitter: passive_linear,
         gates.Phaseshifter: passive_linear,

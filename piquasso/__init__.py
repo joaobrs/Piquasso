@@ -38,6 +38,7 @@ from piquasso._backends.gaussian import GaussianState, GaussianSimulator
 from piquasso._backends.fock import (
     FockState,
     PureFockState,
+    BatchPureFockState,
     FockSimulator,
     PureFockSimulator,
 )
@@ -52,6 +53,7 @@ from .instructions.preparations import (
     DensityMatrix,
     Create,
     Annihilate,
+    Batch,
 )
 
 from .instructions.gates import (
@@ -115,6 +117,7 @@ __all__ = [
     "SamplingState",
     "FockState",
     "PureFockState",
+    "BatchPureFockState",
     # Preparations
     "Vacuum",
     "Mean",
@@ -124,6 +127,7 @@ __all__ = [
     "DensityMatrix",
     "Create",
     "Annihilate",
+    "Batch",
     # Gates
     "GaussianTransform",
     "Phaseshifter",

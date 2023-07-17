@@ -30,7 +30,13 @@ from piquasso.api.exceptions import (
     InvalidSimulation,
     InvalidState,
 )
-from piquasso.api.instruction import Gate, Instruction, Measurement, Preparation
+from piquasso.api.instruction import (
+    Gate,
+    Instruction,
+    Measurement,
+    Preparation,
+    BatchPreparation,
+)
 
 from piquasso._math.lists import is_ordered_sublist, deduplicate_neighbours
 
@@ -219,6 +225,13 @@ class Simulator(Computer, _mixins.CodeMixin):
                 instruction.modes = tuple(range(self.d))
 
             calculation = self._get_calculation(instruction)
+
+            if isinstance(instruction, BatchPreparation):
+                subprograms = instruction.params["subprograms"]
+
+                results = [self.execute(subprogram) for subprogram in subprograms]
+
+                instruction._extra_params["results"] = results
 
             result = calculation(result.state, instruction, shots)
 
