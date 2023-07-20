@@ -35,7 +35,7 @@ from piquasso.api.instruction import (
     Instruction,
     Measurement,
     Preparation,
-    BatchPreparation,
+    BatchInstruction,
 )
 
 from piquasso._math.lists import is_ordered_sublist, deduplicate_neighbours
@@ -180,6 +180,14 @@ class Simulator(Computer, _mixins.CodeMixin):
 
         self._validate_instructions(program.instructions)
 
+    def _maybe_postprocess_batch_instruction(
+        self, instruction: Instruction
+    ) -> Instruction:
+        if isinstance(instruction, BatchInstruction):
+            instruction._extra_params["execute"] = self.execute
+
+        return instruction
+
     def execute_instructions(
         self,
         instructions: List[Instruction],
@@ -226,12 +234,7 @@ class Simulator(Computer, _mixins.CodeMixin):
 
             calculation = self._get_calculation(instruction)
 
-            if isinstance(instruction, BatchPreparation):
-                subprograms = instruction.params["subprograms"]
-
-                results = [self.execute(subprogram) for subprogram in subprograms]
-
-                instruction._extra_params["results"] = results
+            instruction = self._maybe_postprocess_batch_instruction(instruction)
 
             result = calculation(result.state, instruction, shots)
 

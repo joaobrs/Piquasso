@@ -42,7 +42,7 @@ class BatchPureFockState(PureFockState):
 
         super().__init__(d=d, calculator=calculator, config=config)
 
-    def _initialize(self, state_vectors):
+    def _apply_separate_state_vectors(self, state_vectors):
         self._state_vector = self._np.array(
             state_vectors, dtype=self._config.complex_dtype
         ).T

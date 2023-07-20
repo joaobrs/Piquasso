@@ -53,7 +53,6 @@ from .instructions.preparations import (
     DensityMatrix,
     Create,
     Annihilate,
-    Batch,
 )
 
 from .instructions.gates import (
@@ -92,6 +91,11 @@ from .instructions.channels import (
     LossyInterferometer,
 )
 
+from .instructions.batch import (
+    BatchPrepare,
+    BatchApply,
+)
+
 
 __all__ = [
     # API
@@ -127,7 +131,6 @@ __all__ = [
     "DensityMatrix",
     "Create",
     "Annihilate",
-    "Batch",
     # Gates
     "GaussianTransform",
     "Phaseshifter",
@@ -158,6 +161,9 @@ __all__ = [
     "Attenuator",
     "Loss",
     "LossyInterferometer",
+    # Batch
+    "BatchPrepare",
+    "BatchApply",
 ]
 
 __version__ = "3.0.0"

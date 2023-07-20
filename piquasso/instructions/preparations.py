@@ -18,7 +18,7 @@ from typing import Iterable
 import numpy as np
 
 from piquasso.core import _mixins
-from piquasso.api.instruction import Preparation, BatchPreparation
+from piquasso.api.instruction import Preparation
 from piquasso.api.exceptions import InvalidParameter, InvalidState
 
 from piquasso._math.validations import all_natural, all_real_and_positive
@@ -299,13 +299,3 @@ class Annihilate(Preparation):
 
     def __init__(self) -> None:
         pass
-
-
-class Batch(BatchPreparation):
-    r"""Allows for batch processing of multiple states.
-
-    NOTE: This feature is experimental.
-    """
-
-    def __init__(self, subprograms) -> None:
-        super().__init__(params=dict(subprograms=subprograms))

@@ -855,15 +855,42 @@ def _add_occupation_number_basis(  # type: ignore
     )
 
 
-def batch(state: PureFockState, instruction: Instruction, shots: int):
+def batch_prepare(state: PureFockState, instruction: Instruction, shots: int):
+    subprograms = instruction._all_params["subprograms"]
+    execute = instruction._all_params["execute"]
+
     state_vectors = [
-        result.state._state_vector for result in instruction._all_params["results"]
+        execute(subprogram, shots).state._state_vector for subprogram in subprograms
     ]
 
     batch_state = BatchPureFockState(
         d=state.d, calculator=state._calculator, config=state._config
     )
 
-    batch_state._initialize(state_vectors)
+    batch_state._apply_separate_state_vectors(state_vectors)
 
     return Result(state=batch_state)
+
+
+def batch_apply(state: BatchPureFockState, instruction: Instruction, shots: int):
+    subprograms = instruction._all_params["subprograms"]
+    execute = instruction._all_params["execute"]
+
+    d = state.d
+    calculator = state._calculator
+    config = state._config
+
+    resulting_state_vectors = []
+
+    for state_vector, subprogram in zip(state._batch_state_vectors, subprograms):
+        small_state = PureFockState(d=d, calculator=calculator, config=config)
+
+        small_state._state_vector = state_vector
+
+        resulting_state_vectors.append(
+            execute(subprogram, initial_state=small_state).state._state_vector
+        )
+
+    state._apply_separate_state_vectors(resulting_state_vectors)
+
+    return Result(state=state)

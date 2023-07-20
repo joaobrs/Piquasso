@@ -198,12 +198,12 @@ class Instruction(_mixins.DictMixin, _mixins.RegisterMixin, _mixins.CodeMixin):
             )
 
 
+class BatchInstruction(Instruction):
+    """Base class to control batch processing."""
+
+
 class Preparation(Instruction):
     """Base class for preparations."""
-
-
-class BatchPreparation(Preparation):
-    """Base class for batch preparations"""
 
 
 class Gate(Instruction):

@@ -88,7 +88,7 @@ with tf.GradientTape() as tape:
         preparations.append(preparation)
 
     with pq.Program() as program:
-        pq.Q() | pq.Batch(preparations)
+        pq.Q() | pq.BatchPrepare(preparations)
 
         i = 0
         for col in range(d):
