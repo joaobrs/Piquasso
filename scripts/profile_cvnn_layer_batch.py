@@ -20,14 +20,15 @@ import time
 import numpy as np
 
 
-PROFILE = True
-number_of_inputs = 2
-inputs = 0.01 * np.random.rand(number_of_inputs)
+PROFILE = False
+number_of_inputs = 10000
+inputs = 1.0 * np.random.rand(number_of_inputs)
 d = 2
 cutoff = 16
+number_of_layers = 2
 
 
-def create_layer_parameters(d: int):
+def create_single_layer_parameters(d: int):
     number_of_beamsplitters: int
     if d % 2 == 0:
         number_of_beamsplitters = (d // 2) ** 2
@@ -69,11 +70,18 @@ simulator = pq.TensorflowPureFockSimulator(
     d=d, config=pq.Config(cutoff=cutoff, normalize=False)
 )
 
-parameters = create_layer_parameters(d)
+all_parameters = [create_single_layer_parameters(d) for _ in range(number_of_layers)]
+
 
 if PROFILE:
     profiler_options = tf.profiler.experimental.ProfilerOptions(python_tracer_level=1)
     tf.profiler.experimental.start("logdir", options=profiler_options)
+
+import tracemalloc
+# Store 25 frames
+tracemalloc.start(25)
+
+
 
 with tf.GradientTape() as tape:
     preparations = []
@@ -90,48 +98,57 @@ with tf.GradientTape() as tape:
     with pq.Program() as program:
         pq.Q() | pq.BatchPrepare(preparations)
 
-        i = 0
-        for col in range(d):
-            if col % 2 == 0:
-                for mode in range(0, d - 1, 2):
-                    modes = (mode, mode + 1)
-                    pq.Q(*modes) | pq.Beamsplitter(parameters["thetas_1"][i], phi=0.0)
-                    i += 1
+        for parameters in all_parameters:
+            i = 0
+            for col in range(d):
+                if col % 2 == 0:
+                    for mode in range(0, d - 1, 2):
+                        modes = (mode, mode + 1)
+                        pq.Q(*modes) | pq.Beamsplitter(
+                            parameters["thetas_1"][i], phi=0.0
+                        )
+                        i += 1
 
-            if col % 2 == 1:
-                for mode in range(1, d - 1, 2):
-                    modes = (mode, mode + 1)
-                    pq.Q(*modes) | pq.Beamsplitter(parameters["thetas_1"][i], phi=0.0)
-                    i += 1
+                if col % 2 == 1:
+                    for mode in range(1, d - 1, 2):
+                        modes = (mode, mode + 1)
+                        pq.Q(*modes) | pq.Beamsplitter(
+                            parameters["thetas_1"][i], phi=0.0
+                        )
+                        i += 1
 
-        for i in range(d - 1):
-            pq.Q(i) | pq.Phaseshifter(parameters["phis_1"][i])
+            for i in range(d - 1):
+                pq.Q(i) | pq.Phaseshifter(parameters["phis_1"][i])
 
-        for mode, r in enumerate(parameters["squeezings"]):
-            pq.Q(mode) | pq.Squeezing(r)
+            for mode, r in enumerate(parameters["squeezings"]):
+                pq.Q(mode) | pq.Squeezing(r)
 
-        i = 0
-        for col in range(d):
-            if col % 2 == 0:
-                for mode in range(0, d - 1, 2):
-                    modes = (mode, mode + 1)
-                    pq.Q(*modes) | pq.Beamsplitter(parameters["thetas_2"][i], phi=0.0)
-                    i += 1
+            i = 0
+            for col in range(d):
+                if col % 2 == 0:
+                    for mode in range(0, d - 1, 2):
+                        modes = (mode, mode + 1)
+                        pq.Q(*modes) | pq.Beamsplitter(
+                            parameters["thetas_2"][i], phi=0.0
+                        )
+                        i += 1
 
-            if col % 2 == 1:
-                for mode in range(1, d - 1, 2):
-                    modes = (mode, mode + 1)
-                    pq.Q(*modes) | pq.Beamsplitter(parameters["thetas_2"][i], phi=0.0)
-                    i += 1
+                if col % 2 == 1:
+                    for mode in range(1, d - 1, 2):
+                        modes = (mode, mode + 1)
+                        pq.Q(*modes) | pq.Beamsplitter(
+                            parameters["thetas_2"][i], phi=0.0
+                        )
+                        i += 1
 
-        for i in range(d - 1):
-            pq.Q(i) | pq.Phaseshifter(parameters["phis_2"][i])
+            for i in range(d - 1):
+                pq.Q(i) | pq.Phaseshifter(parameters["phis_2"][i])
 
-        for mode, r in enumerate(parameters["displacements"]):
-            pq.Q(mode) | pq.Displacement(r=r)
+            for mode, r in enumerate(parameters["displacements"]):
+                pq.Q(mode) | pq.Displacement(r=r)
 
-        for mode, xi in enumerate(parameters["kappas"]):
-            pq.Q(mode) | pq.Kerr(xi=xi)
+            for mode, xi in enumerate(parameters["kappas"]):
+                pq.Q(mode) | pq.Kerr(xi=xi)
 
     start_time = time.time()
     state = simulator.execute(program).state
@@ -141,7 +158,8 @@ with tf.GradientTape() as tape:
 
     cost = tf.reduce_sum(tf.abs(mean_position - expected_mean_positions))
 
-flattened_parameters = (
+
+flattened_parameters = sum([
     parameters["thetas_1"]
     + parameters["phis_1"]
     + parameters["squeezings"]
@@ -149,13 +167,29 @@ flattened_parameters = (
     + parameters["phis_2"]
     + parameters["displacements"]
     + parameters["kappas"]
-)
+    for parameters in all_parameters
+], [])
 
 start_time = time.time()
 gradient = tape.gradient(cost, flattened_parameters)
 
 print("GRADIENT CALCULATION TIME:", time.time() - start_time)
 print("GRADIENT:", [g.numpy() for g in gradient])
-
 if PROFILE:
     tf.profiler.experimental.stop()
+
+
+snapshot = tracemalloc.take_snapshot()
+top_stats_lineno = snapshot.statistics('lineno')
+
+print("[ Top 1 ]")
+for stat in top_stats_lineno[:1]:
+    print(stat)
+
+
+# pick the biggest memory block
+top_stats = snapshot.statistics('traceback')
+stat = top_stats[0]
+print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+for line in stat.traceback.format():
+    print(line)
