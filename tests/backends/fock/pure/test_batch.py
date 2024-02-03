@@ -237,8 +237,8 @@ def test_Batch_with_OneByOne():
     with pq.Program() as common2:
         pq.Q(0, 1) | pq.Beamsplitter(theta=np.pi / 5, phi=np.pi / 6)
 
-        pq.Q(0) | pq.Displacement(-1.0, phi=np.pi/3)
-        pq.Q(0) | pq.Squeezing(0.2, phi=np.pi/5)
+        pq.Q(0) | pq.Displacement(-1.0, phi=np.pi / 3)
+        pq.Q(0) | pq.Squeezing(0.2, phi=np.pi / 5)
 
     with pq.Program() as first_intermediate:
         pq.Q(0) | pq.Kerr(0.1)

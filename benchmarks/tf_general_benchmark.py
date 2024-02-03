@@ -67,8 +67,10 @@ def piquasso_benchmark(cutoff, alpha, r, xi):
         pq.Q(0) | pq.Kerr(xi)
         pq.Q(1) | pq.Kerr(xi)
 
-    simulator_fock = pq.TensorflowPureFockSimulator(
-        d=2, config=pq.Config(cutoff=cutoff)
+    simulator_fock = pq.PureFockSimulator(
+        d=2,
+        config=pq.Config(cutoff=cutoff),
+        calculator=pq.TensorflowCalculator(),
     )
 
     with tf.GradientTape() as tape:
@@ -81,7 +83,6 @@ def piquasso_benchmark(cutoff, alpha, r, xi):
 
 
 def strawberryfields_benchmark(cutoff, alpha, r, xi):
-
     profiler_options = tf.profiler.experimental.ProfilerOptions(
         host_tracer_level=3, python_tracer_level=3, device_tracer_level=3
     )

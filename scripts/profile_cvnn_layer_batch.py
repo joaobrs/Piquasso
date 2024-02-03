@@ -66,8 +66,10 @@ target_state_vector = np.zeros(cutoff_cardinality(cutoff=cutoff, d=d), dtype=com
 target_state_vector[1] = 1.0
 target_state = tf.constant(target_state_vector, dtype=tf.complex128)
 
-simulator = pq.TensorflowPureFockSimulator(
-    d=d, config=pq.Config(cutoff=cutoff, normalize=False)
+simulator = pq.PureFockSimulator(
+    d=d,
+    config=pq.Config(cutoff=cutoff, normalize=False),
+    calculator=pq.TensorflowCalculator(),
 )
 
 all_parameters = [create_single_layer_parameters(d) for _ in range(number_of_layers)]
@@ -78,9 +80,9 @@ if PROFILE:
     tf.profiler.experimental.start("logdir", options=profiler_options)
 
 import tracemalloc
+
 # Store 25 frames
 tracemalloc.start(25)
-
 
 
 with tf.GradientTape() as tape:
@@ -159,16 +161,19 @@ with tf.GradientTape() as tape:
     cost = tf.reduce_sum(tf.abs(mean_position - expected_mean_positions))
 
 
-flattened_parameters = sum([
-    parameters["thetas_1"]
-    + parameters["phis_1"]
-    + parameters["squeezings"]
-    + parameters["thetas_2"]
-    + parameters["phis_2"]
-    + parameters["displacements"]
-    + parameters["kappas"]
-    for parameters in all_parameters
-], [])
+flattened_parameters = sum(
+    [
+        parameters["thetas_1"]
+        + parameters["phis_1"]
+        + parameters["squeezings"]
+        + parameters["thetas_2"]
+        + parameters["phis_2"]
+        + parameters["displacements"]
+        + parameters["kappas"]
+        for parameters in all_parameters
+    ],
+    [],
+)
 
 start_time = time.time()
 gradient = tape.gradient(cost, flattened_parameters)
@@ -180,7 +185,7 @@ if PROFILE:
 
 
 snapshot = tracemalloc.take_snapshot()
-top_stats_lineno = snapshot.statistics('lineno')
+top_stats_lineno = snapshot.statistics("lineno")
 
 print("[ Top 1 ]")
 for stat in top_stats_lineno[:1]:
@@ -188,7 +193,7 @@ for stat in top_stats_lineno[:1]:
 
 
 # pick the biggest memory block
-top_stats = snapshot.statistics('traceback')
+top_stats = snapshot.statistics("traceback")
 stat = top_stats[0]
 print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
 for line in stat.traceback.format():

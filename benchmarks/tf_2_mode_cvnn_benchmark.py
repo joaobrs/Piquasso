@@ -51,6 +51,7 @@ def cutoff():
 def layers():
     return 10
 
+
 @pytest.fixture
 def d():
     return 2
@@ -74,8 +75,10 @@ def piquasso_benchmark(benchmark, cutoff, alpha, r, xi, layers, d):
                 for i in range(d):
                     pq.Q(i) | pq.Kerr(xi)
 
-        simulator_fock = pq.TensorflowPureFockSimulator(
-            d=d, config=pq.Config(cutoff=cutoff, normalize=False)
+        simulator_fock = pq.PureFockSimulator(
+            d=d,
+            config=pq.Config(cutoff=cutoff, normalize=False),
+            calculator=pq.TensorflowCalculator(),
         )
 
         with tf.GradientTape() as tape:
@@ -104,7 +107,9 @@ def strawberryfields_benchmark(benchmark, cutoff, alpha, r, xi, layers, d):
                     sf.ops.Dgate(param) | q[i]
                     sf.ops.Sgate(r) | q[i]
 
-                sf.ops.Interferometer(unitary_group.rvs(d)) | tuple(q[i] for i in range(d))
+                sf.ops.Interferometer(unitary_group.rvs(d)) | tuple(
+                    q[i] for i in range(d)
+                )
 
                 for i in range(d):
                     sf.ops.Kgate(xi) | q[i]

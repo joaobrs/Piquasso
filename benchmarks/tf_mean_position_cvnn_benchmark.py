@@ -48,7 +48,6 @@ def cutoff():
 
 
 def piquasso_benchmark(benchmark, cutoff, alpha, r, xi):
-
     d = 2
     alpha_ = tf.Variable(alpha)
 
@@ -64,8 +63,10 @@ def piquasso_benchmark(benchmark, cutoff, alpha, r, xi):
         for i in range(d):
             pq.Q(i) | pq.Kerr(xi)
 
-    simulator_fock = pq.TensorflowPureFockSimulator(
-        d=2, config=pq.Config(cutoff=cutoff)
+    simulator_fock = pq.PureFockSimulator(
+        d=2,
+        config=pq.Config(cutoff=cutoff),
+        calculator=pq.TensorflowCalculator(),
     )
 
     profiler_options = tf.profiler.experimental.ProfilerOptions(
@@ -73,7 +74,6 @@ def piquasso_benchmark(benchmark, cutoff, alpha, r, xi):
     )
 
     tf.profiler.experimental.start("logdir", options=profiler_options)
-
 
     with tf.GradientTape() as tape:
         state = simulator_fock.execute(program).state
@@ -85,7 +85,6 @@ def piquasso_benchmark(benchmark, cutoff, alpha, r, xi):
 
 
 def strawberryfields_benchmark(benchmark, cutoff, alpha, r, xi):
-
     @benchmark
     def func():
         program = sf.Program(2)
