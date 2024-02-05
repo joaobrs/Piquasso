@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Callable, TYPE_CHECKING
 
 from functools import lru_cache
-
-import numpy as np
 
 from piquasso._math.fock import FockSpace, cutoff_cardinality
 
@@ -34,13 +32,16 @@ from piquasso.instructions import gates
 
 from piquasso.api.result import Result
 
+if TYPE_CHECKING:
+    import numpy as np
+
 
 def passive_linear(
     state: PureFockState, instruction: gates._PassiveLinearGate, shots: int
 ) -> Result:
     calculator = state._calculator
 
-    interferometer: np.ndarray = instruction._get_passive_block(
+    interferometer: "np.ndarray" = instruction._get_passive_block(
         state._calculator, state._config
     ).astype(state._config.complex_dtype)
 
@@ -63,7 +64,7 @@ def _get_interferometer_on_fock_space(interferometer, space, calculator):
         index_dict = _calculate_interferometer_helper_indices(space)
 
         subspace_representations = _calculate_interferometer_on_fock_space(
-            interferometer, index_dict
+            interferometer, index_dict, calculator
         )
         grad = _calculate_interferometer_gradient_on_fock_space(
             interferometer, calculator, subspace_representations, index_dict
@@ -78,6 +79,7 @@ def _get_interferometer_on_fock_space(interferometer, space, calculator):
 
 @lru_cache(maxsize=None)
 def _calculate_interferometer_helper_indices(space):
+    np = space._calculator.fallback_np
     d = space.d
     cutoff = space.cutoff
     space = [np.array(element, dtype=int) for element in space]
@@ -144,7 +146,7 @@ def _calculate_interferometer_helper_indices(space):
     }
 
 
-def _calculate_interferometer_on_fock_space(interferometer, index_dict):
+def _calculate_interferometer_on_fock_space(interferometer, index_dict, calculator):
     """Calculates finite representation of interferometer in the Fock space.
     The function assumes the knowledge of the 1-particle unitary.
 
@@ -159,6 +161,8 @@ def _calculate_interferometer_on_fock_space(interferometer, index_dict):
     Returns:
         numpy.ndarray: Finite representation of interferometer in the Fock space
     """
+
+    np = calculator.fallback_np
 
     subspace_representations = []
 
@@ -325,7 +329,7 @@ def _calculate_interferometer_gradient_on_fock_space(
 
 def _apply_passive_gate_matrix_to_state(
     state: PureFockState,
-    subspace_transformations: List[np.ndarray],
+    subspace_transformations: List["np.ndarray"],
     modes: Tuple[int, ...],
 ) -> None:
     calculator = state._calculator
@@ -343,12 +347,14 @@ def _apply_passive_gate_matrix_to_state(
         index_list = _calculate_index_list_for_appling_interferometer(
             modes,
             space,
+            calculator,
         )
 
         new_state_vector = _calculate_state_vector_after_interferometer(
             state_vector,
             subspace_transformations,
             index_list,
+            calculator,
         )
 
         grad = _create_linear_passive_gate_gradient_function(
@@ -368,7 +374,10 @@ def _apply_passive_gate_matrix_to_state(
 def _calculate_index_list_for_appling_interferometer(
     modes: Tuple[int, ...],
     space: FockSpace,
-) -> List[np.ndarray]:
+    calculator,
+) -> List["np.ndarray"]:
+    np = calculator.fallback_np
+
     cutoff = space.cutoff
     d = space.d
     calculator = space._calculator
@@ -413,10 +422,13 @@ def _calculate_index_list_for_appling_interferometer(
 
 
 def _calculate_state_vector_after_interferometer(
-    state_vector: np.ndarray,
-    subspace_transformations: List[np.ndarray],
-    index_list: List[np.ndarray],
-) -> np.ndarray:
+    state_vector: "np.ndarray",
+    subspace_transformations: List["np.ndarray"],
+    index_list: List["np.ndarray"],
+    calculator,
+) -> "np.ndarray":
+    np = calculator.fallback_np
+
     new_state_vector = np.empty_like(state_vector)
 
     is_batch = len(state_vector.shape) == 2
@@ -432,9 +444,9 @@ def _calculate_state_vector_after_interferometer(
 
 
 def _create_linear_passive_gate_gradient_function(
-    state_vector: np.ndarray,
-    subspace_transformations: List[np.ndarray],
-    index_list: List[np.ndarray],
+    state_vector: "np.ndarray",
+    subspace_transformations: List["np.ndarray"],
+    index_list: List["np.ndarray"],
     calculator: BaseCalculator,
 ) -> Callable:
     def applying_interferometer_gradient(upstream):

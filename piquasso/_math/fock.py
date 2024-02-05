@@ -14,9 +14,8 @@
 # limitations under the License.
 
 import functools
-from typing import Optional, Tuple, Iterable, Generator, Any, List
+from typing import Optional, Tuple, Iterable, Generator, Any, List, TYPE_CHECKING
 
-import numpy as np
 from operator import add
 
 from scipy.special import factorial, comb
@@ -34,6 +33,10 @@ from piquasso._math.gate_matrices import (
     create_single_mode_squeezing_matrix,
 )
 from piquasso.api.calculator import BaseCalculator
+
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @functools.lru_cache()
@@ -164,10 +167,10 @@ class FockSpace(tuple):
 
     def get_passive_fock_operator(
         self,
-        operator: np.ndarray,
+        operator: "np.ndarray",
         modes: Tuple[int, ...],
         d: int,
-    ) -> np.ndarray:
+    ) -> "np.ndarray":
         indices = get_operator_index(modes)
 
         embedded_operator = self._calculator.embed_in_identity(operator, indices, d)
@@ -184,7 +187,7 @@ class FockSpace(tuple):
         *,
         r: float,
         phi: float,
-    ) -> np.ndarray:
+    ) -> "np.ndarray":
         @self.calculator.custom_gradient
         def _single_mode_squeezing_operator(r, phi):
             r = self.calculator.maybe_convert_to_numpy(r)
@@ -206,7 +209,7 @@ class FockSpace(tuple):
 
     def get_single_mode_cubic_phase_operator(
         self, *, gamma: float, hbar: float, calculator: BaseCalculator
-    ) -> np.ndarray:
+    ) -> "np.ndarray":
         r"""Cubic Phase gate.
 
         The definition of the Cubic Phase gate is
@@ -242,10 +245,10 @@ class FockSpace(tuple):
 
     def embed_matrix(
         self,
-        matrix: np.ndarray,
+        matrix: "np.ndarray",
         modes: Tuple[int, ...],
         auxiliary_modes: Tuple[int, ...],
-    ) -> np.ndarray:
+    ) -> "np.ndarray":
         indices = []
         updates = []
 
@@ -266,9 +269,9 @@ class FockSpace(tuple):
         self,
         *,
         modes: Tuple[int, ...],
-        active_block: np.ndarray,
-        passive_block: np.ndarray,
-    ) -> np.ndarray:
+        active_block: "np.ndarray",
+        passive_block: "np.ndarray",
+    ) -> "np.ndarray":
         r"""The matrix of the symplectic transformation in Fock space.
 
         Any symplectic transformation (in complex representation) can be written as
@@ -447,9 +450,9 @@ class FockSpace(tuple):
 
     def symmetric_tensorpower(
         self,
-        operator: np.ndarray,
+        operator: "np.ndarray",
         n: int,
-    ) -> np.ndarray:
+    ) -> "np.ndarray":
         d = len(operator)
 
         np = self.calculator.np
@@ -474,7 +477,9 @@ class FockSpace(tuple):
 
         return np.array(matrix)
 
-    def get_creation_operator(self, modes: Tuple[int, ...]) -> np.ndarray:
+    def get_creation_operator(self, modes: Tuple[int, ...]) -> "np.ndarray":
+        np = self._calculator.fallback_np
+
         operator = np.zeros(
             shape=(self.cardinality,) * 2, dtype=self.config.complex_dtype
         )
@@ -490,7 +495,7 @@ class FockSpace(tuple):
 
         return operator
 
-    def get_annihilation_operator(self, modes: Tuple[int, ...]) -> np.ndarray:
+    def get_annihilation_operator(self, modes: Tuple[int, ...]) -> "np.ndarray":
         return self.get_creation_operator(modes).transpose()
 
     def get_single_mode_displacement_operator(self, *, r, phi):

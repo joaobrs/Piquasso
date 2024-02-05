@@ -15,12 +15,11 @@
 
 from .passive_linear import passive_linear  # noqa: F401
 
-from typing import Optional, Tuple, Mapping
+from typing import Optional, Tuple, Mapping, TYPE_CHECKING
 
 from functools import lru_cache
 
 import random
-import numpy as np
 
 from piquasso._math.fock import cutoff_cardinality
 
@@ -36,6 +35,9 @@ from piquasso.instructions import gates
 
 from piquasso.api.result import Result
 from piquasso.api.instruction import Instruction
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 def particle_number_measurement(
@@ -54,7 +56,9 @@ def particle_number_measurement(
     # NOTE: We choose the last sample for multiple shots.
     sample = samples[-1]
 
-    normalization = _get_normalization(probability_map, sample)
+    normalization = _get_normalization(
+        probability_map, sample, calculator=state._calculator
+    )
 
     _project_to_subspace(
         state=state,
@@ -73,8 +77,12 @@ def vacuum(state: PureFockState, instruction: Instruction, shots: int) -> Result
 
 
 def _get_normalization(
-    probability_map: Mapping[Tuple[int, ...], float], sample: Tuple[int, ...]
+    probability_map: Mapping[Tuple[int, ...], float],
+    sample: Tuple[int, ...],
+    calculator,
 ) -> float:
+    np = calculator.fallback_np
+
     return np.sqrt(1 / probability_map[sample])
 
 
@@ -96,7 +104,7 @@ def _project_to_subspace(
 
 def _get_projected_state_vector(
     state: PureFockState, *, subspace_basis: Tuple[int, ...], modes: Tuple[int, ...]
-) -> np.ndarray:
+) -> "np.ndarray":
     new_state_vector = state._get_empty()
 
     index = state._space.get_projection_operator_indices_for_pure(
@@ -111,7 +119,7 @@ def _get_projected_state_vector(
 
 def _apply_active_gate_matrix_to_state(
     state: PureFockState,
-    matrix: np.ndarray,
+    matrix: "np.ndarray",
     mode: int,
 ) -> None:
     calculator = state._calculator
@@ -128,7 +136,7 @@ def _apply_active_gate_matrix_to_state(
             space, auxiliary_subspace, mode
         )
         new_state_vector = _calculate_state_vector_after_apply_active_gate(
-            state_vector, matrix, state_index_matrix_list
+            state_vector, matrix, state_index_matrix_list, calculator
         )
         grad = _create_linear_active_gate_gradient_function(
             state_vector, matrix, state_index_matrix_list, calculator
@@ -140,6 +148,8 @@ def _apply_active_gate_matrix_to_state(
 
 @lru_cache(maxsize=None)
 def _calculate_state_index_matrix_list(space, auxiliary_subspace, mode):
+    np = space.calculator.fallback_np
+
     d = space.d
     cutoff = space.cutoff
 
@@ -172,8 +182,10 @@ def _calculate_state_index_matrix_list(space, auxiliary_subspace, mode):
 
 
 def _calculate_state_vector_after_apply_active_gate(
-    state_vector, matrix, state_index_matrix_list
+    state_vector, matrix, state_index_matrix_list, calculator
 ):
+    np = calculator.fallback_np
+
     new_state_vector = np.empty_like(state_vector, dtype=state_vector.dtype)
 
     is_batch = len(state_vector.shape) == 2

@@ -75,3 +75,21 @@ class NumpyCalculator(_BuiltinCalculator):
             return result
 
         return wrapper
+
+
+class CupyCalculator(NumpyCalculator):
+    def __init__(self):
+        try:
+            import cupy as cp
+        except ImportError:
+            raise ImportError(
+                "You have invoked a feature which requires 'cupy'.\n"
+                "You can install cupy via:\n"
+                "\n"
+                "pip install piquasso[cupy]"
+            )
+
+        super().__init__()
+
+        self.np = cp
+        self.fallback_np = cp
