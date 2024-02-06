@@ -385,3 +385,24 @@ def _apply_beamsplitter5050(state, modes):
         modes=modes,
         calculator=state._calculator,
     )
+
+
+def phaseshifter(
+    state: PureFockState, instruction: gates._PassiveLinearGate, shots: int
+) -> Result:
+    phi = instruction._all_params["phi"]
+
+    mode = instruction.modes[0]
+
+    _apply_phaseshifter(state, phi, mode, state._calculator)
+
+    return Result(state=state)
+
+
+def _apply_phaseshifter(state, phi, mode, calculator) -> Result:
+    np = calculator.np
+
+    coefficients = np.exp(1j * phi * np.array([basis[mode] for basis in state._space]))
+
+    # NOTE: Transposition is done here in order to work with batch processing.
+    state.state_vector = (coefficients * state.state_vector.T).T

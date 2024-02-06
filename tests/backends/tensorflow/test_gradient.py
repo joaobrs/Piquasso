@@ -541,19 +541,53 @@ def test_jacobian_of_state_after_mixing_with_fix_Interferometer():
     )
 
 
-def test_Phaseshifter_density_matrix_gradient():
+def test_Phaseshifter_state_vector_gradient():
     phi = tf.Variable(np.pi / 3)
 
     simulator = pq.PureFockSimulator(
-        d=1, config=pq.Config(cutoff=2), calculator=pq.TensorflowCalculator()
+        d=1, config=pq.Config(cutoff=3), calculator=pq.TensorflowCalculator()
     )
 
-    coefficients = [np.sqrt(0.6), np.sqrt(0.4)]
+    coefficients = np.array([np.sqrt(0.5), np.sqrt(0.3), np.sqrt(0.2)])
 
     with tf.GradientTape() as tape:
         with pq.Program() as program:
             pq.Q(0) | pq.StateVector([0]) * coefficients[0]
             pq.Q(0) | pq.StateVector([1]) * coefficients[1]
+            pq.Q(0) | pq.StateVector([2]) * coefficients[2]
+
+            pq.Q(0) | pq.Phaseshifter(phi)
+
+        state = simulator.execute(program).state
+
+        state_vector = state.state_vector
+
+    jacobian = tape.jacobian(state_vector, [phi])
+
+    hamiltonian = np.array([0, 1, 2])
+
+    assert np.allclose(state_vector, np.exp(1j * phi * hamiltonian) * coefficients)
+
+    assert np.allclose(
+        jacobian,
+        np.real(1j * hamiltonian * state_vector),
+    )
+
+
+def test_Phaseshifter_density_matrix_gradient():
+    phi = tf.Variable(np.pi / 3)
+
+    simulator = pq.PureFockSimulator(
+        d=1, config=pq.Config(cutoff=3), calculator=pq.TensorflowCalculator()
+    )
+
+    coefficients = [np.sqrt(0.5), np.sqrt(0.3), np.sqrt(0.2)]
+
+    with tf.GradientTape() as tape:
+        with pq.Program() as program:
+            pq.Q(0) | pq.StateVector([0]) * coefficients[0]
+            pq.Q(0) | pq.StateVector([1]) * coefficients[1]
+            pq.Q(0) | pq.StateVector([2]) * coefficients[2]
 
             pq.Q(0) | pq.Phaseshifter(phi)
 
@@ -569,20 +603,26 @@ def test_Phaseshifter_density_matrix_gradient():
             [
                 coefficients[0] ** 2,
                 coefficients[0] * coefficients[1] * np.exp(-1j * phi),
+                coefficients[0] * coefficients[2] * np.exp(-1j * phi * 2),
             ],
             [
-                coefficients[0] * coefficients[1] * np.exp(1j * phi),
+                coefficients[1] * coefficients[0] * np.exp(1j * phi),
                 coefficients[1] ** 2,
+                coefficients[1] * coefficients[2] * np.exp(-1j * phi),
+            ],
+            [
+                coefficients[2] * coefficients[0] * np.exp(1j * phi * 2),
+                coefficients[2] * coefficients[1] * np.exp(1j * phi),
+                coefficients[2] ** 2,
             ],
         ],
     )
 
+    hamiltonian = np.diag(np.array([0, 1, 2]))
+
     assert np.allclose(
         jacobian,
-        [
-            [0.0, -np.prod(coefficients) * np.sin(phi)],
-            [-np.prod(coefficients) * np.sin(phi), 0.0],
-        ],
+        np.real(1j * (hamiltonian @ density_matrix - density_matrix @ hamiltonian)),
     )
 
 
