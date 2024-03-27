@@ -32,14 +32,17 @@ def project_to_subspace(
     normalization: float,
     calculator: BaseCalculator
 ) -> None:
-    projected_state_vector = _get_projected_state_vector(
-        state=state, subspace_basis=subspace_basis, modes=modes, calculator=calculator
+    projected_state_vector = get_projected_state_vector(
+        state=state,
+        subspace_basis=subspace_basis,
+        modes=modes,
+        calculator=calculator,
     )
 
     state.state_vector = projected_state_vector * normalization
 
 
-def _get_projected_state_vector(
+def get_projected_state_vector(
     state: PureFockState,
     *,
     subspace_basis: Tuple[int, ...],
