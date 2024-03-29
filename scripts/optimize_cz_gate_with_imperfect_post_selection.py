@@ -9,28 +9,71 @@ tf.get_logger().setLevel("ERROR")
 
 
 def _calculate_loss(weights, P, calculator, state_vector, cutoff):
-    d = 3
+    d = 8
     config = pq.Config(cutoff=cutoff, normalize=False)
     np = calculator.np
-    phase_shifter_phis = weights[:3]
-    thetas = weights[3:6]
-    phis = weights[6:]
+
+    modes = (0, 1, 2, 3)
+    ancilla_modes = (4, 5, 6, 7)
+
+    state_00 = [0, 1, 0, 1]
+    state_01 = [0, 1, 1, 0]
+    state_10 = [1, 0, 0, 1]
+    state_11 = [1, 0, 1, 0]
+
+    ancilla_state = [1, 0, 1, 0]
+
+    preparation = pq.Program(instructions=[
+        pq.StateVector(state_00 + ancilla_state, coefficient=state_vector[0]),
+        pq.StateVector(state_01 + ancilla_state, coefficient=state_vector[1]),
+        pq.StateVector(state_10 + ancilla_state, coefficient=state_vector[2]),
+        pq.StateVector(state_11 + ancilla_state, coefficient=state_vector[3]),
+    ])
+
+    phase_shifter_phis = weights[0][:3]
+    thetas = weights[0][3:6]
+    phis = weights[0][6:]
+
+    ns_0 = pq.Program(
+        instructions=[
+            pq.Phaseshifter(phase_shifter_phis[0]).on_modes(modes[0]),
+            pq.Phaseshifter(phase_shifter_phis[1]).on_modes(ancilla_modes[0]),
+            pq.Phaseshifter(phase_shifter_phis[2]).on_modes(ancilla_modes[1]),
+
+            pq.Beamsplitter(theta=thetas[0], phi=phis[0]).on_modes(ancilla_modes[0], ancilla_modes[1]),
+            pq.Beamsplitter(theta=thetas[1], phi=phis[1]).on_modes(modes[0], ancilla_modes[0]),
+            pq.Beamsplitter(theta=thetas[2], phi=phis[2]).on_modes(ancilla_modes[0], ancilla_modes[1]),
+        ]
+    )
+
+    phase_shifter_phis = weights[1][:3]
+    thetas = weights[1][3:6]
+    phis = weights[1][6:]
+
+    ns_1 = pq.Program(
+        instructions=[
+            pq.Phaseshifter(phase_shifter_phis[0]).on_modes(modes[2]),
+            pq.Phaseshifter(phase_shifter_phis[1]).on_modes(ancilla_modes[2]),
+            pq.Phaseshifter(phase_shifter_phis[2]).on_modes(ancilla_modes[3]),
+
+            pq.Beamsplitter(theta=thetas[0], phi=phis[0]).on_modes(ancilla_modes[2], ancilla_modes[3]),
+            pq.Beamsplitter(theta=thetas[1], phi=phis[1]).on_modes(modes[2], ancilla_modes[2]),
+            pq.Beamsplitter(theta=thetas[2], phi=phis[2]).on_modes(ancilla_modes[2], ancilla_modes[3]),
+        ]
+    )
 
     program = pq.Program(instructions=[
-        pq.StateVector([0, 1, 0], coefficient=state_vector[0]),
-        pq.StateVector([1, 1, 0], coefficient=state_vector[1]),
-        pq.StateVector([2, 1, 0], coefficient=state_vector[2]),
+        *preparation.instructions,
 
-        pq.Phaseshifter(phase_shifter_phis[0]).on_modes(0),
-        pq.Phaseshifter(phase_shifter_phis[1]).on_modes(1),
-        pq.Phaseshifter(phase_shifter_phis[2]).on_modes(2),
+        pq.Beamsplitter(theta=np.pi / 4).on_modes(0, 2),
 
-        pq.Beamsplitter(theta=thetas[0], phi=phis[0]).on_modes(1, 2),
-        pq.Beamsplitter(theta=thetas[1], phi=phis[1]).on_modes(0, 1),
-        pq.Beamsplitter(theta=thetas[2], phi=phis[2]).on_modes(1, 2),
+        *ns_0.instructions,
+        *ns_1.instructions,
+
+        pq.Beamsplitter(theta=-np.pi / 4).on_modes(0, 2),
 
         pq.ImperfectPostSelectPhotons(
-            postselect_modes=(1, 2),
+            postselect_modes=ancilla_modes,
             photon_counts=(1, 0),
             detector_efficiency_matrix=P
         )
@@ -38,19 +81,16 @@ def _calculate_loss(weights, P, calculator, state_vector, cutoff):
 
     simulator = pq.PureFockSimulator(d=d, config=config, calculator=calculator)
 
-    reduced_state = simulator.execute(program).state.reduced((0, ))
+    reduced_state = simulator.execute(program).state.reduced(modes)
 
-    density_matrix = reduced_state.density_matrix[:3, :3]
+    density_matrix = reduced_state.density_matrix[:4, :4]
 
     norm = tf.math.reduce_sum(fock_probabilities(d=d, config=config, density_matrix=density_matrix))
     normalized_density_matrix = density_matrix / norm
 
     expected_state = state_vector
-    expected_state = calculator.assign(expected_state, 2, -expected_state[2])
+    expected_state = calculator.assign(expected_state, 3, -expected_state[3])
 
-    target_density_matrix = np.outer(np.conj(expected_state), expected_state)
-
-    # loss = tf.norm(normalized_density_matrix - target_density_matrix, ord=2)
     loss = 1 - tf.math.abs(np.conj(expected_state) @ normalized_density_matrix @ expected_state)
 
     return loss
@@ -79,14 +119,14 @@ def train_step(weights, P, calculator, state_vector, cutoff):
 
 def main():
     opt = tf.keras.optimizers.Adam(learning_rate=0.00025)
-    decorator = tf.function(jit_compile=True)
+    decorator = tf.function(jit_compile=False)
     calculator = pq.TensorflowCalculator(decorate_with=decorator)
     np = calculator.np
     fallback_np = calculator.fallback_np
     fallback_np.random.seed(123)
-    loss_file = "losses_imperfect3.csv"
+    loss_file = "losses_cz.csv"
 
-    cutoff = 4
+    cutoff = 5
 
     P = fallback_np.array([
         [1.0, 0.1050, 0.0110, 0.0012, 0.001, 0.0, 0.0, 0.0, 0.0],
@@ -104,9 +144,13 @@ def main():
 
     ideal_weights = fallback_np.array([np.pi, 0.0, 0.0, np.pi / 8, 65.5302 * 2 * np.pi / 360, - np.pi / 8, 0, 0, 0])
     # errors = fallback_np.random.normal(0, 0.1, size=9)
-    weights = tf.Variable(ideal_weights, dtype=tf.float64)
+    weights_np = np.array([
+        ideal_weights,
+        ideal_weights
+    ])
+    weights = tf.Variable(weights_np, dtype=tf.float64)
 
-    state_vector = np.sqrt([0.2, 0.3, 0.5])
+    state_vector = np.sqrt([0.1, 0.2, 0.3, 0.4])
 
     with open(loss_file, "w") as f:
         f.write("iteration,loss\n")

@@ -72,7 +72,6 @@ def train_step(weights, calculator, state_vector):
 
 
 def main():
-    opt = tf.keras.optimizers.Adam(learning_rate=0.0000010)
     decorator = tf.function(jit_compile=True)
     calculator = pq.TensorflowCalculator(decorate_with=decorator)
     np = calculator.np
@@ -80,12 +79,17 @@ def main():
     fallback_np.random.seed(123)
 
     ideal_weights = fallback_np.array([np.pi, 0.0, 0.0, np.pi / 8, 65.5302 * 2 * np.pi / 360, - np.pi / 8, 0, 0, 0])
+
+    opt = tf.keras.optimizers.Adam(learning_rate=0.00025)
     errors = fallback_np.random.normal(0, 0.1, size=9)
-    weights = tf.Variable(ideal_weights + errors, dtype=tf.float64)
+    # error = fallback_np.random.normal(0, 0.1)
+    weights_np = ideal_weights.copy()
+    weights_np += errors
+    weights = tf.Variable(weights_np, dtype=tf.float64)
 
     state_vector = np.sqrt([0.2, 0.3, 0.5])
 
-    with open("losses.csv", "a+") as f:
+    with open(f"losses.csv", "w") as f:
         f.write("iteration,loss\n")
 
     enhanced_train_step = decorator(train_step)
@@ -97,10 +101,10 @@ def main():
             state_vector=state_vector
         )
 
-        opt.apply_gradients(zip(grad, [weights]))
+        opt.apply_gradients(zip([grad], [weights]))
 
         print(f"loss: {loss}")
-        with open("losses.csv", "a+") as f:
+        with open(f"losses.csv", "a+") as f:
             f.write(f"{i},{loss}\n")
 
 
