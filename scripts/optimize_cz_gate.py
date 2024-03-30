@@ -4,10 +4,11 @@ import tensorflow as tf
 
 from tqdm import tqdm
 
+
 tf.get_logger().setLevel("ERROR")
 
 
-def _calculate_loss(weights, P, calculator, state_vector, cutoff):
+def _calculate_loss(weights, calculator, state_vector, cutoff):
     d = 8
     config = pq.Config(cutoff=cutoff, normalize=False)
     np = calculator.np
@@ -71,10 +72,9 @@ def _calculate_loss(weights, P, calculator, state_vector, cutoff):
 
         pq.Beamsplitter(theta=-np.pi / 4).on_modes(0, 2),
 
-        pq.ImperfectPostSelectPhotons(
+        pq.PostSelectPhotons(
             postselect_modes=ancilla_modes,
-            photon_counts=ancilla_state,
-            detector_efficiency_matrix=P
+            photon_counts=ancilla_state
         )
     ])
 
@@ -102,11 +102,11 @@ def _calculate_loss(weights, P, calculator, state_vector, cutoff):
 
     return loss
 
-def train_step(weights, P, calculator, state_vector, cutoff):
+
+def train_step(weights, calculator, state_vector, cutoff):
     with tf.GradientTape() as tape:
         loss = _calculate_loss(
             weights=weights,
-            P=P,
             calculator=calculator,
             state_vector=state_vector,
             cutoff=cutoff
@@ -124,30 +124,16 @@ def main():
     np = calculator.np
     fallback_np = calculator.fallback_np
     fallback_np.random.seed(123)
-    loss_file = "losses_cz_imperfect.csv"
+    loss_file = "losses_cz_perfect.csv"
 
     cutoff = 5
 
-    P = fallback_np.array([
-        [1.0, 0.1050, 0.0110, 0.0012, 0.001, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.8950, 0.2452, 0.0513, 0.0097, 0.0017, 0.0003, 0.0001, 0.0],
-        [0.0, 0.0, 0.7438, 0.3770, 0.1304, 0.0384, 0.0104, 0.0027, 0.0007],
-        [0.0, 0.0, 0.0, 0.5706, 0.4585, 0.2361, 0.0996, 0.0375, 0.0132],
-        [0.0, 0.0, 0.0, 0.0, 0.4013, 0.4672, 0.3346, 0.1907, 0.0952],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.2565, 0.4076, 0.3870, 0.2862],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1476, 0.3066, 0.3724],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0755, 0.1985],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9338]
-    ])
-
-    P = P[:cutoff, :cutoff]
-    # P = np.eye(cutoff)
-
     ideal_weights = fallback_np.array([np.pi, 0.0, 0.0, np.pi / 8, 65.5302 * 2 * np.pi / 360, - np.pi / 8, 0, 0, 0])
-    # errors = fallback_np.random.normal(0, 0.1, size=9)
+    errors = fallback_np.random.normal(0, 0.1, size=9)
+
     weights_np = np.array([
-        ideal_weights,
-        ideal_weights
+        ideal_weights + errors,
+        ideal_weights + errors
     ])
     weights = tf.Variable(weights_np, dtype=tf.float64)
 
@@ -161,13 +147,10 @@ def main():
     for i in tqdm(range(5000)):
         loss, grad = enhanced_train_step(
             weights=weights,
-            P=P,
             calculator=calculator,
             state_vector=state_vector,
             cutoff=cutoff
         )
-
-        print(loss)
 
         opt.apply_gradients(zip([grad], [weights]))
 
